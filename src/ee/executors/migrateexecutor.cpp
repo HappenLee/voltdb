@@ -123,6 +123,9 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
                 }
             }
 
+            std::stringstream message;
+            message << "Migrating " << targetTable->name() << " count:" << targetTable->visibleTupleCount() << " temp:" << m_inputTable->tempTableTupleCount();
+
             vassert(m_inputTuple.columnCount() == m_inputTable->columnCount());
             vassert(targetTuple.columnCount() == targetTable->columnCount());
             TableIterator input_iterator = m_inputTable->iterator();
@@ -142,6 +145,10 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
             if (m_replicatedTableOperation) {
                 s_modifiedTuples = migrated_tuples;
             }
+            message << " m:" << migrated_tuples << '\n';
+            std::string str = message.str();
+
+            LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);
         }
         else {
             if (s_modifiedTuples == -1) {

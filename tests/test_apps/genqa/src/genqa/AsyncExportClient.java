@@ -378,16 +378,51 @@ public class AsyncExportClient
                 trigger_migrate(0);
                 Thread.sleep(7500);
 
-                log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
-                log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
-                log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
-
-                VoltTable[] results = log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
-                if (results != null && results[1].asScalarLong() > 0) {
-                    log.info("triggering one more  migrate");
+               
+                VoltTable[] results = log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
+                boolean more = (results != null && results[1].asScalarLong() > 0);
+                results = log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
+                if (!more) {
+                    more = (results != null && results[1].asScalarLong() > 0);
+                }
+                results = log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
+                if (!more) {
+                    more = (results != null && results[1].asScalarLong() > 0);
+                }
+                results =  log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
+                if (!more) {
+                    more = (results != null && results[1].asScalarLong() > 0);
+                }
+                if (more) {
+                    log.info("triggering one more migrate 1");
                     trigger_migrate(0);
                     Thread.sleep(7500);
                     log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
+                    log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
+                    log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
+                    log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
+                    
+                    log.info("triggering one more migrate 2");
+                    trigger_migrate(0);
+                    Thread.sleep(7500);
+                    log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
+                    log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
+                    log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
+                    log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
+                    
+                    log.info("triggering one more migrate 3");
+                    trigger_migrate(0);
+                    Thread.sleep(7500);
+                    log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
+                    log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
+                    log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
+                    log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
+                    
+                    log.info("log count...");
+                    logcounts("EXPORT_PARTITIONED_TABLE_JDBC");
+                    logcounts("EXPORT_REPLICATED_TABLE_JDBC");
+                    logcounts("EXPORT_PARTITIONED_TABLE_KAFKA");
+                    logcounts("EXPORT_REPLICATED_TABLE_KAFKA");
                 }
             }
 
@@ -533,6 +568,29 @@ public class AsyncExportClient
         return null;
     }
 
+    private static void logcounts(String table) {
+        try {
+            VoltTable[] results = clientRef.get().callProcedure("@AdHoc",
+                                                                "SELECT COUNT(*) FROM " + table + " WHERE MIGRATING; " +
+                                                                "SELECT COUNT(*) FROM " + table + " WHERE NOT MIGRATING AND type_not_null_timestamp < NOW; " +
+                                                                "SELECT COUNT(*) FROM " + table
+                                                                ).getResults();
+            long migrating = results[0].asScalarLong();
+            long not_migrating = results[1].asScalarLong();
+            long total = results[2].asScalarLong();
+
+            log.info("row counts for " + table +
+                     ": total: " + total +
+                     ", migrating: " + migrating +
+                     ", not migrating: " + not_migrating);
+        }
+        catch (Exception e) {
+            // log it and otherwise ignore it.  it's not fatal to fail if the
+            // SELECTS due to a migrate or some other exception
+            log.fatal("log_migrating_counts exception: " + e);
+            e.printStackTrace();
+        }
+    }
     private static void trigger_migrate(int time_window) {
         try {
             VoltTable[] results;

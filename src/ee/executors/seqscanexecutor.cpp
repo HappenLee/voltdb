@@ -153,6 +153,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                (int)input_table->activeTupleCount(),
                (int)input_table->allocatedTupleCount());
 
+    std::stringstream message;
+    message << "SeqScan " << input_table->name() << " count:" << input_table->activeTupleCount();
+
     //
     // OPTIMIZATION: NESTED PROJECTION
     //
@@ -303,6 +306,9 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     //* for debug */    " put " << output_table->activeTupleCount() << " tuples " << std::endl;
     VOLT_TRACE("\n%s\n", node->getOutputTable()->debug().c_str());
     VOLT_DEBUG("Finished Seq scanning");
+    message << " out:" << m_tmpOutputTable->tempTableTupleCount() << '\n';
+    std::string str = message.str();
+    LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);
 
     return true;
 }
