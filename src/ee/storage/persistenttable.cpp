@@ -2513,8 +2513,6 @@ bool PersistentTable::deleteMigratedRows(int64_t deletableTxnId) {
    if (currIt == m_migratingRows.end() || currIt->first > deletableTxnId) {
        return false;
    }
-   VOLT_DEBUG("Migrated rows deleted. table %s, batch: %ld, target sphandle: %lld, batch remaining: %ld",
-        name().c_str(),batch.size(), deletableTxnId, m_migratingRows.size());
    return true;
 }
 

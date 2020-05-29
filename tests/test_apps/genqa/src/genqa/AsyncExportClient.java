@@ -401,7 +401,7 @@ public class AsyncExportClient
                     log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
                     log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
                     log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
-                    
+
                     log.info("triggering one more migrate 2");
                     trigger_migrate(0);
                     Thread.sleep(7500);
@@ -409,7 +409,7 @@ public class AsyncExportClient
                     log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
                     log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
                     log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
-                    
+
                     log.info("triggering one more migrate 3");
                     trigger_migrate(0);
                     Thread.sleep(7500);
@@ -417,7 +417,7 @@ public class AsyncExportClient
                     log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
                     log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
                     log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
-                    
+
                     log.info("log count...");
                     logcounts("EXPORT_PARTITIONED_TABLE_JDBC");
                     logcounts("EXPORT_REPLICATED_TABLE_JDBC");

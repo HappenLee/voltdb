@@ -107,6 +107,7 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
     VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", targetTable->debug("").c_str());
 
     int64_t migrated_tuples = 0;
+    int64_t tuples = 0;
     {
         vassert(m_replicatedTableOperation == targetTable->isReplicatedTable());
         ConditionalSynchronizedExecuteWithMpMemory possiblySynchronizedUseMpMemory(
@@ -125,7 +126,16 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
 
             std::stringstream message;
             message << "Migrating " << targetTable->name() << " count:" << targetTable->visibleTupleCount() << " temp:" << m_inputTable->tempTableTupleCount();
-
+            if (m_inputTable->tempTableTupleCount() == 0) {
+                TableIterator it = targetTable->iterator();
+                while (it.next(m_inputTuple)) {
+                   void *target_address = m_inputTuple.getNValue(0).castAsAddress();
+                   targetTuple.move(target_address);
+                   if (!targetTuple.getHiddenNValue(targetTable->getMigrateColumnIndex()).isNull()) {
+                       tuples++;
+                   }
+               }
+            }
             vassert(m_inputTuple.columnCount() == m_inputTable->columnCount());
             vassert(targetTuple.columnCount() == targetTable->columnCount());
             TableIterator input_iterator = m_inputTable->iterator();
@@ -145,7 +155,7 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
             if (m_replicatedTableOperation) {
                 s_modifiedTuples = migrated_tuples;
             }
-            message << " m:" << migrated_tuples << '\n';
+            message << " m:" << migrated_tuples << " Not NULL:" << tuples;
             std::string str = message.str();
 
             LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);

@@ -182,6 +182,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // at the TargetTable. Therefore, there is nothing we more we need
     // to do here
     //
+    int64_t tuples = 0;
     if (node->getPredicate() != NULL || projectionNode != NULL ||
         limit_node != NULL || m_aggExec != NULL || m_insertExec != NULL ||
         node->isCteScan())
@@ -285,10 +286,12 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                         temp_tuple.setNValue(ctr, value);
                     }
                     outputTuple(temp_tuple);
+                    tuples++;
                 }
                 else
                 {
                     outputTuple(tuple);
+                    tuples++;
                 }
                 pmp.countdownProgress();
             }
@@ -301,14 +304,15 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             m_insertExec->p_execute_finish();
         }
     }
+    message << " out:" << m_tmpOutputTable->tempTableTupleCount() << " N:" << tuples;
+    std::string str = message.str();
+    LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);
+
     //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<
     //* for debug */    " output table " << (void*)output_table <<
     //* for debug */    " put " << output_table->activeTupleCount() << " tuples " << std::endl;
     VOLT_TRACE("\n%s\n", node->getOutputTable()->debug().c_str());
     VOLT_DEBUG("Finished Seq scanning");
-    message << " out:" << m_tmpOutputTable->tempTableTupleCount() << '\n';
-    std::string str = message.str();
-    LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);
 
     return true;
 }
