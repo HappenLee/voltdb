@@ -102,6 +102,7 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
     vassert(targetTable);
 
     TableTuple targetTuple = TableTuple(targetTable->schema());
+    TableTuple t = TableTuple(targetTable->schema());
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug("").c_str());
     VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", targetTable->debug("").c_str());
@@ -128,8 +129,8 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
             message << "Migrating " << targetTable->name() << " count:" << targetTable->visibleTupleCount() << " temp:" << m_inputTable->tempTableTupleCount();
             if (m_inputTable->tempTableTupleCount() == 0) {
                 TableIterator it = targetTable->iterator();
-                while (it.next(m_inputTuple)) {
-                   void *target_address = m_inputTuple.getNValue(0).castAsAddress();
+                while (it.next(t)) {
+                   void *target_address = t.getNValue(0).castAsAddress();
                    targetTuple.move(target_address);
                    if (!targetTuple.getHiddenNValue(targetTable->getMigrateColumnIndex()).isNull()) {
                        tuples++;
