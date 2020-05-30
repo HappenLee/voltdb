@@ -183,6 +183,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // to do here
     //
     int64_t tuples = 0;
+    int rows = 0;
     if (node->getPredicate() != NULL || projectionNode != NULL ||
         limit_node != NULL || m_aggExec != NULL || m_insertExec != NULL ||
         node->isCteScan())
@@ -198,7 +199,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         if (predicate)
         {
-            message << "\nSCAN PREDICATE\n" << predicate->debug(true).c_str() << "\n";
+            message << "\n PREDICATE\n" << predicate->debug(true).c_str() << "\n";
         	VOLT_DEBUG("SCAN PREDICATE :\n%s\n", predicate->debug(true).c_str());
         }
 
@@ -255,7 +256,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         else {
             temp_tuple = m_tmpOutputTable->tempTuple();
         }
-        int rows = 0;
+
         while (postfilter.isUnderLimit() && iterator.next(tuple))
         {
 #if   defined(VOLT_TRACE_ENABLED)
@@ -270,9 +271,6 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                  NValue txnId = tuple.getHiddenNValue((dynamic_cast<PersistentTable*>(input_table))->getMigrateColumnIndex());
                  if(txnId.isNull()){
                     rows++;
-                    if (rows < 10) {
-                        message << tuple.debug() << "\n";
-                    }
                  }
             }
 
@@ -314,8 +312,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             m_insertExec->p_execute_finish();
         }
     }
-    message << " OutTemp:" << m_tmpOutputTable->tempTableTupleCount() << " N:" << tuples << " O:" <<
-         node->getOutputTable()->activeTupleCount();
+    message << " TEMP:" << m_tmpOutputTable->tempTableTupleCount() << " VALID:" << tuples << " OUT:" <<
+         node->getOutputTable()->activeTupleCount() << " NULL:" << rows;
     if (input_table->name().compare("EXPORT_PARTITIONED_TABLE_KAFKA") ==0) {
        std::string str = message.str();
        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);
