@@ -198,7 +198,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         if (predicate)
         {
-            VOLT_DEBUG("SCAN PREDICATE :\n%s\n", predicate->debug(true).c_str());
+            message << "SCAN PREDICATE\n" << predicate->debug(true).c_str();
+        	VOLT_DEBUG("SCAN PREDICATE :\n%s\n", predicate->debug(true).c_str());
         }
 
         int limit = CountingPostfilter::NO_LIMIT;
@@ -254,7 +255,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         else {
             temp_tuple = m_tmpOutputTable->tempTuple();
         }
-
+        int rows = 0;
         while (postfilter.isUnderLimit() && iterator.next(tuple))
         {
 #if   defined(VOLT_TRACE_ENABLED)
@@ -265,6 +266,15 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                        ++tuple_ctr,
                        (int)input_table->activeTupleCount());
             pmp.countdownProgress();
+            if (isTableWithMigrate((dynamic_cast<PersistentTable*>(input_table))->getTableType())) {
+                 NValue txnId = tuple.getHiddenNValue((dynamic_cast<PersistentTable*>(input_table))->getMigrateColumnIndex());
+                 if(txnId.isNull()){
+                    rows++;
+                    if (rows < 10) {
+                        message << tuple.debug();
+                    }
+                 }
+            }
 
             //
             // For each tuple we need to evaluate it against our predicate and limit/offset
@@ -304,7 +314,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             m_insertExec->p_execute_finish();
         }
     }
-    message << " out:" << m_tmpOutputTable->tempTableTupleCount() << " N:" << tuples;
+    message << " out:" << m_tmpOutputTable->tempTableTupleCount() << " N:" << tuples << " outtable" <<
+         node->getOutputTable()->activeTupleCount();
     std::string str = message.str();
     LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);
 
