@@ -198,7 +198,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         if (predicate)
         {
-            VOLT_TRACE("SCAN PREDICATE :\n%s\n", predicate->debug(true).c_str());
+            VOLT_DEBUG("SCAN PREDICATE :\n%s\n", predicate->debug(true).c_str());
         }
 
         int limit = CountingPostfilter::NO_LIMIT;
@@ -312,7 +312,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     //* for debug */    " output table " << (void*)output_table <<
     //* for debug */    " put " << output_table->activeTupleCount() << " tuples " << std::endl;
     VOLT_TRACE("\n%s\n", node->getOutputTable()->debug().c_str());
-    VOLT_DEBUG("Finished Seq scanning");
+    VOLT_DEBUG("Finished Seq scanning: %d", (int)node->getOutputTable()->activeTupleCount());
 
     return true;
 }

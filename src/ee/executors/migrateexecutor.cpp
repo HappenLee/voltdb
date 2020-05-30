@@ -102,7 +102,7 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
     vassert(targetTable);
 
     TableTuple targetTuple = TableTuple(targetTable->schema());
-    TableTuple t = TableTuple(targetTable->schema());
+
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug("").c_str());
     VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", targetTable->debug("").c_str());
@@ -127,14 +127,15 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
 
             std::stringstream message;
             message << "Migrating " << targetTable->name() << " count:" << targetTable->visibleTupleCount() << " temp:" << m_inputTable->tempTableTupleCount();
+            VOLT_DEBUG("migrate %s count %d, temp %1d", targetTable->name().c_str(), targetTable->visibleTupleCount(), (int)m_inputTable->tempTableTupleCount());
             if (m_inputTable->tempTableTupleCount() == 0) {
                 TableIterator it = targetTable->iterator();
+                TableTuple t = TableTuple(targetTable->schema());
                 while (it.next(t)) {
-                   void *target_address = t.getNValue(0).castAsAddress();
-                   targetTuple.move(target_address);
-                   if (!targetTuple.getHiddenNValue(targetTable->getMigrateColumnIndex()).isNull()) {
-                       tuples++;
+                   if (t.getHiddenNValue(targetTable->getMigrateColumnIndex()).isNull()) {
+                       continue;
                    }
+                   tuples++;
                }
             }
             vassert(m_inputTuple.columnCount() == m_inputTable->columnCount());
