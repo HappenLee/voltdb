@@ -154,7 +154,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                (int)input_table->allocatedTupleCount());
 
     std::stringstream message;
-    message << "SeqScan " << input_table->name() << " count:" << input_table->activeTupleCount();
+    message << "SeqScan " << input_table->name() << " INPUT:" << input_table->activeTupleCount();
 
     //
     // OPTIMIZATION: NESTED PROJECTION
@@ -198,7 +198,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         if (predicate)
         {
-            message << "SCAN PREDICATE\n" << predicate->debug(true).c_str();
+            message << "\nSCAN PREDICATE\n" << predicate->debug(true).c_str() << "\n";
         	VOLT_DEBUG("SCAN PREDICATE :\n%s\n", predicate->debug(true).c_str());
         }
 
@@ -271,7 +271,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                  if(txnId.isNull()){
                     rows++;
                     if (rows < 10) {
-                        message << tuple.debug();
+                        message << tuple.debug() << "\n";
                     }
                  }
             }
@@ -314,10 +314,12 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             m_insertExec->p_execute_finish();
         }
     }
-    message << " out:" << m_tmpOutputTable->tempTableTupleCount() << " N:" << tuples << " outtable" <<
+    message << " OutTemp:" << m_tmpOutputTable->tempTableTupleCount() << " N:" << tuples << " O:" <<
          node->getOutputTable()->activeTupleCount();
-    std::string str = message.str();
-    LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);
+    if (input_table->name().compare("EXPORT_PARTITIONED_TABLE_KAFKA") ==0) {
+       std::string str = message.str();
+       LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);
+    }
 
     //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<
     //* for debug */    " output table " << (void*)output_table <<
