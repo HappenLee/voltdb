@@ -167,6 +167,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     IndexLookupType localLookupType = m_lookupType;
     SortDirectionType localSortDirection = m_sortDirection;
 
+    std::stringstream message;
+    message << "IdxScan "<< targetTable->name() << " Input:" << targetTable->activeTupleCount();
+
     //
     // INLINE LIMIT
     //
@@ -487,10 +490,19 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     //
     // We have different nextValue() methods for different lookup types
     //
+    int pendingDelete = 0;
+    int nullRows = 0;
     while (postfilter.isUnderLimit() && getNextTuple(
                 localLookupType, &tuple, tableIndex, &indexCursor, activeNumOfSearchKeys)) {
         if (tuple.isPendingDelete()) {
+            pendingDelete++;
             continue;
+        }
+        if (isTableWithMigrate(targetTable->getTableType())) {
+            NValue txnId = tuple.getHiddenNValue(targetTable->getMigrateColumnIndex());
+            if(txnId.isNull()){
+                nullRows++;
+            }
         }
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
 
@@ -528,6 +540,11 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
         }
     }
 
+    message << " Pending:" << pendingDelete << " NULL:" << nullRows << " OUT:" << m_tmpOutputTable->tempTableTupleCount();
+    if (targetTable->name().compare("EXPORT_PARTITIONED_TABLE_KAFKA") ==0) {
+       std::string str = message.str();
+       LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);
+    }
     if (m_aggExec != nullptr) {
         m_aggExec->p_execute_finish();
     } else if (m_insertExec != nullptr) {
