@@ -50,6 +50,7 @@ import org.voltdb.utils.CompressionService;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
+import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Longs;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -82,6 +83,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     // HSId of the destination mailbox
     private final long m_destHSId;
     private final Set<Long> m_otherDestHostHSIds;
+    private final Set<Integer> m_destinationHosts;
     private final boolean m_replicatedTableTarget;
     // input and output threads
     private final SnapshotSender m_sender;
@@ -105,7 +107,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     private Runnable m_progressHandler = null;
 
     private final AtomicBoolean m_closed = new AtomicBoolean(false);
-
+    private long m_lastDelivered;
     public StreamSnapshotDataTarget(long HSId, boolean lowestDestSite, Set<Long> allDestHostHSIds,
             byte[] hashinatorConfig, List<SnapshotTableInfo> tables, SnapshotSender sender,
             StreamSnapshotAckReceiver ackReceiver)
@@ -127,6 +129,10 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         m_destHSId = HSId;
         m_replicatedTableTarget = lowestDestSite;
         m_otherDestHostHSIds = new HashSet<>(allDestHostHSIds);
+        m_destinationHosts = new HashSet<>();
+        for (Long hsid : allDestHostHSIds) {
+            m_destinationHosts.add(CoreUtils.getHostIdFromHSId(hsid));
+        }
         m_otherDestHostHSIds.remove(m_destHSId);
         m_sender = sender;
         m_sender.registerDataTarget(m_targetId);
@@ -144,6 +150,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             // Send the hashinator config as  the first block
             send(StreamSnapshotMessageType.HASHINATOR, -1, hashinatorConfig, false);
         }
+        m_lastDelivered = System.currentTimeMillis();
     }
 
     public boolean isReplicatedTableTarget() {
@@ -335,7 +342,16 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
                 rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
                         CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOS_S));
-
+                if (bytesWritten > 0) {
+                    m_lastDelivered = System.currentTimeMillis();
+                } else if (TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis() - m_lastDelivered) > 1) {
+                    // No data sent for one long minute, are all destinations still alive?
+                    Set<Integer> destHosts = new HashSet<>(m_destinationHosts);
+                    destHosts.removeAll(VoltDB.instance().getHostMessenger().getLiveHostIds());
+                    if (destHosts.size() == m_destinationHosts.size()) {
+                        m_closed.set(true);
+                    }
+                }
                 checkTimeout(m_writeTimeout);
                 if (m_writeFailed.get() != null) {
                     clearOutstanding(); // idempotent
@@ -344,7 +360,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 rejoinLog.error("Stream snapshot watchdog thread threw an exception", t);
             } finally {
                 // schedule to run again
-                VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+                if (!m_closed.get()) {
+                    VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+                }
             }
         }
     }
