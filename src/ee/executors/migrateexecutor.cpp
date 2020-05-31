@@ -133,9 +133,9 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
                 TableTuple t = TableTuple(targetTable->schema());
                 while (it.next(t)) {
                    if (t.getHiddenNValue(targetTable->getMigrateColumnIndex()).isNull()) {
-                       continue;
+                       tuples++;
                    }
-                   tuples++;
+
                }
             }
             vassert(m_inputTuple.columnCount() == m_inputTable->columnCount());
@@ -157,7 +157,7 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
             if (m_replicatedTableOperation) {
                 s_modifiedTuples = migrated_tuples;
             }
-            message << " m:" << migrated_tuples << " Not NULL:" << tuples;
+            message << " m:" << migrated_tuples << " NULL:" << tuples;
             std::string str = message.str();
 
             LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);
