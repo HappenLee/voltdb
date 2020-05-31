@@ -416,6 +416,7 @@ public class AsyncExportClient
 //                    log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
 //                    log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
                     log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
+                    log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
 //                    log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
 
                     log.info("log count...");
