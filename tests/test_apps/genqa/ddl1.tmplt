@@ -24,6 +24,15 @@ AS
 -- Change data capture (CDC) table used with "tableexport" test cases
 %%TABLE name=export_partitioned_table_cdc, export_target=kafka_target, export_cdc="insert, update, delete", partition_key=rowid
 
+-- Export Table for Partitioned Data Table deletions
+%%STREAM name=export_partitioned_table_kafka, export_target=kafka_target, partition_key=rowid
+
+%%STREAM name=export_partitioned_table_rabbit, export_target=rabbit_target, partition_key=rowid
+
+%%STREAM name=export_partitioned_table_file, export_target=file_target, partition_key=rowid
+
+%%STREAM name=export_partitioned_table_jdbc, export_target=jdbc_target, partition_key=rowid
+
 %%STREAM name=topic_stream, topic=True, partition_key=rowid
 
 %%TABLE name=export_mirror_partitioned_table, partition_key=rowid
