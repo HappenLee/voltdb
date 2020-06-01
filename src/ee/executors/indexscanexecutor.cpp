@@ -540,7 +540,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
         }
     }
 
-    message << " Pending:" << pendingDelete << " NULL:" << nullRows << " OUT:" << m_tmpOutputTable->tempTableTupleCount();
+    message << " Pending:" << pendingDelete << " NULL:" << nullRows << " OUTTEMP:" << m_tmpOutputTable->tempTableTupleCount() <<
+    		" OUT" << m_outputTable->tempTableTupleCount();
     if (targetTable->name().compare("EXPORT_PARTITIONED_TABLE_KAFKA") ==0) {
        std::string str = message.str();
        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);
