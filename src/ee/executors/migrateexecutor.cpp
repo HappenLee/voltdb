@@ -158,9 +158,10 @@ bool MigrateExecutor::p_execute(const NValueArray &params) {
                 s_modifiedTuples = migrated_tuples;
             }
             message << " m:" << migrated_tuples << " NULL:" << tuples;
-            std::string str = message.str();
-
-            LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);
+            if (targetTable->name().compare("EXPORT_PARTITIONED_TABLE_KAFKA") ==0) {
+                std::string str = message.str();
+               LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);
+            }
         }
         else {
             if (s_modifiedTuples == -1) {

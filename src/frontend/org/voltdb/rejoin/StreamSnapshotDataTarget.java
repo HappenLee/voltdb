@@ -50,7 +50,6 @@ import org.voltdb.utils.CompressionService;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Throwables;
-import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.primitives.Longs;
 import com.google_voltpatches.common.util.concurrent.Futures;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
@@ -83,7 +82,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
     // HSId of the destination mailbox
     private final long m_destHSId;
     private final Set<Long> m_otherDestHostHSIds;
-    private final Set<Integer> m_destinationHosts;
     private final boolean m_replicatedTableTarget;
     // input and output threads
     private final SnapshotSender m_sender;
@@ -129,10 +127,6 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         m_destHSId = HSId;
         m_replicatedTableTarget = lowestDestSite;
         m_otherDestHostHSIds = new HashSet<>(allDestHostHSIds);
-        m_destinationHosts = new HashSet<>();
-        for (Long hsid : allDestHostHSIds) {
-            m_destinationHosts.add(CoreUtils.getHostIdFromHSId(hsid));
-        }
         m_otherDestHostHSIds.remove(m_destHSId);
         m_sender = sender;
         m_sender.registerDataTarget(m_targetId);
@@ -345,10 +339,9 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 if (bytesWritten > 0) {
                     m_lastDelivered = System.currentTimeMillis();
                 } else if (TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis() - m_lastDelivered) > 1) {
-                    // No data sent for one long minute, are all destinations still alive?
-                    Set<Integer> destHosts = new HashSet<>(m_destinationHosts);
-                    destHosts.removeAll(VoltDB.instance().getHostMessenger().getLiveHostIds());
-                    if (destHosts.size() == m_destinationHosts.size()) {
+                    // No data sent for one long minute, is destination still alive?
+                    Set<Integer> liveHosts = VoltDB.instance().getHostMessenger().getLiveHostIds();
+                    if (!liveHosts.contains(CoreUtils.getHostIdFromHSId(m_destHSId))) {
                         m_closed.set(true);
                     }
                 }
