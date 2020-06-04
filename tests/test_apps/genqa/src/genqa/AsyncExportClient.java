@@ -212,6 +212,11 @@ public class AsyncExportClient
     private static ClientStatsContext periodicStatsContext;
     private static ClientStatsContext fullStatsContext;
 
+    private static String[] TABLES = { "EXPORT_PARTITIONED_TABLE_JDBC",
+                                       "EXPORT_REPLICATED_TABLE_JDBC",
+                                       "EXPORT_PARTITIONED_TABLE_KAFKA",
+                                       "EXPORT_REPLICATED_TABLE_KAFKA"};
+
     static {
         VoltDB.setDefaultTimezone();
     }
@@ -307,7 +312,6 @@ public class AsyncExportClient
 
             benchmarkStartTS = System.currentTimeMillis();
             AtomicLong rowId = new AtomicLong(0);
-
             // Run the benchmark loop for the requested duration
             final long endTime = benchmarkStartTS + (1000l * config.duration);
             Random r = new Random();
@@ -366,72 +370,35 @@ public class AsyncExportClient
             timer.cancel();
             // likewise for the migrate task
             migrateTimer.cancel();
-            if (config.migrateWithoutTTL) {
-                log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
-                log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
-                log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
-                log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
+            clientRef.get().drain();
+            int tries = 0;
+            // Give some time for inflight transactions to be completed
+            while ( (TrackingResults.get(0) + TrackingResults.get(1) - rowId.get()) != 0 && tries < 5) {
+                Thread.sleep(20000);
+                tries++;
+            }
+            if ( (TrackingResults.get(0) + TrackingResults.get(1) - rowId.get()) != 0 ) {
+                log.info("WARNING Tracking results total doesn't match final sequence number " + (TrackingResults.get(0) + TrackingResults.get(1)) + "!=" + rowId );
+            }
 
+            if (config.migrateWithoutTTL) {
+                for (String t : TABLES) {
+                    log_migrating_counts(t);
+                }
                 // trigger last "migrate from" cycle and wait a little bit for table to empty, assuming all is working.
                 // otherwise, we'll check the table row count at a higher level and fail the test if the table is not empty.
-<<<<<<< Updated upstream
-                log.info("triggering final migrate");
-                trigger_migrate(0);
-                Thread.sleep(7500);
-
-               
-                VoltTable[] results = log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
-                boolean more = (results != null && results[1].asScalarLong() > 0);
-                results = log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
-                if (!more) {
-                    more = (results != null && results[1].asScalarLong() > 0);
-                }
-                results = log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
-                if (!more) {
-                    more = (results != null && results[1].asScalarLong() > 0);
-                }
-                results =  log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
-                if (!more) {
-                    more = (results != null && results[1].asScalarLong() > 0);
-                }
-                if (more) {
-                    log.info("triggering one more migrate 1");
-=======
                 long count = getCount();
                 tries = 1;
-                while (count > 0 && tries < 20) {
+                if (count > 0 && tries < 10) {
                     Thread.sleep(10000);
                     log.info("triggering final migrate " + tries);
->>>>>>> Stashed changes
                     trigger_migrate(0);
-                    Thread.sleep(7500);
-//                    log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
-//                    log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
-                    log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
-//                    log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
-
-                    log.info("triggering one more migrate 2");
-                    trigger_migrate(0);
-                    Thread.sleep(7500);
-//                    log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
-//                    log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
-                    log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
-//                    log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
-
-                    log.info("triggering one more migrate 3");
-                    trigger_migrate(0);
-                    Thread.sleep(7500);
-//                    log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");
-//                    log_migrating_counts("EXPORT_REPLICATED_TABLE_JDBC");
-                    log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
-                    log_migrating_counts("EXPORT_PARTITIONED_TABLE_KAFKA");
-//                    log_migrating_counts("EXPORT_REPLICATED_TABLE_KAFKA");
-
-                    log.info("log count...");
-//                    logcounts("EXPORT_PARTITIONED_TABLE_JDBC");
-//                    logcounts("EXPORT_REPLICATED_TABLE_JDBC");
-//                    logcounts("EXPORT_PARTITIONED_TABLE_KAFKA");
-//                    logcounts("EXPORT_REPLICATED_TABLE_KAFKA");
+                    Thread.sleep(20000);
+                    for (String t : TABLES) {
+                        log_migrating_counts(t);
+                    }
+                    tries++;
+                    count = getCount();
                 }
             }
 
@@ -551,7 +518,7 @@ public class AsyncExportClient
         }
     }
 
-    private static VoltTable[] log_migrating_counts(String table) {
+    private static void log_migrating_counts(String table) {
         try {
             VoltTable[] results = clientRef.get().callProcedure("@AdHoc",
                                                                 "SELECT COUNT(*) FROM " + table + " WHERE MIGRATING; " +
@@ -566,32 +533,6 @@ public class AsyncExportClient
                      ": total: " + total +
                      ", migrating: " + migrating +
                      ", not migrating: " + not_migrating);
-            return results;
-        }
-        catch (Exception e) {
-            // log it and otherwise ignore it.  it's not fatal to fail if the
-            // SELECTS due to a migrate or some other exception
-            log.fatal("log_migrating_counts exception: " + e);
-            e.printStackTrace();
-        }
-        return null;
-    }
-
-    private static void logcounts(String table) {
-        try {
-            VoltTable[] results = clientRef.get().callProcedure("@AdHoc",
-                                                                "SELECT COUNT(*) FROM " + table + " WHERE MIGRATING; " +
-                                                                "SELECT COUNT(*) FROM " + table + " WHERE NOT MIGRATING AND type_not_null_timestamp < NOW; " +
-                                                                "SELECT COUNT(*) FROM " + table
-                                                                ).getResults();
-            long migrating = results[0].asScalarLong();
-            long not_migrating = results[1].asScalarLong();
-            long total = results[2].asScalarLong();
-
-            log.info("row counts for " + table +
-                     ": total: " + total +
-                     ", migrating: " + migrating +
-                     ", not migrating: " + not_migrating);
         }
         catch (Exception e) {
             // log it and otherwise ignore it.  it's not fatal to fail if the
@@ -600,6 +541,7 @@ public class AsyncExportClient
             e.printStackTrace();
         }
     }
+
     private static void trigger_migrate(int time_window) {
         try {
             VoltTable[] results;
@@ -637,6 +579,16 @@ public class AsyncExportClient
         }
     }
 
+    private static long getCount() {
+        long count = 0;
+        for (String t : TABLES) {
+            count = get_table_count(t);
+            if (count > 0) {
+                return count;
+            }
+        }
+        return count;
+    }
 
     private static long get_table_count(String sqlTable) {
         long count = 0;
