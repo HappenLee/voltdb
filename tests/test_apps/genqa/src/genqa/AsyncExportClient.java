@@ -374,6 +374,7 @@ public class AsyncExportClient
 
                 // trigger last "migrate from" cycle and wait a little bit for table to empty, assuming all is working.
                 // otherwise, we'll check the table row count at a higher level and fail the test if the table is not empty.
+<<<<<<< Updated upstream
                 log.info("triggering final migrate");
                 trigger_migrate(0);
                 Thread.sleep(7500);
@@ -395,6 +396,13 @@ public class AsyncExportClient
                 }
                 if (more) {
                     log.info("triggering one more migrate 1");
+=======
+                long count = getCount();
+                tries = 1;
+                while (count > 0 && tries < 20) {
+                    Thread.sleep(10000);
+                    log.info("triggering final migrate " + tries);
+>>>>>>> Stashed changes
                     trigger_migrate(0);
                     Thread.sleep(7500);
 //                    log_migrating_counts("EXPORT_PARTITIONED_TABLE_JDBC");

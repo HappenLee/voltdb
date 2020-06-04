@@ -336,7 +336,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
                 rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
                         CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOS_S));
-                if (bytesWritten > 0) {
+                if ((bytesWritten -m_bytesWrittenSinceConstruction) > 0) {
                     m_lastDelivered = System.currentTimeMillis();
                 } else if (TimeUnit.MILLISECONDS.toMinutes(System.currentTimeMillis() - m_lastDelivered) > 1) {
                     // No data sent for one long minute, is destination still alive?

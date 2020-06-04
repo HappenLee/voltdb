@@ -168,7 +168,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     SortDirectionType localSortDirection = m_sortDirection;
 
     std::stringstream message;
-    message << "IdxScan "<< targetTable->name() << " Input:" << targetTable->activeTupleCount();
+    message << "IdxScan "<< targetTable->name() << " Active Count:" << targetTable->activeTupleCount()  << " Visible count:" << targetTable->visibleTupleCount();
 
     //
     // INLINE LIMIT
@@ -502,6 +502,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
             NValue txnId = tuple.getHiddenNValue(targetTable->getMigrateColumnIndex());
             if(txnId.isNull()){
                 nullRows++;
+                if (nullRows == 1) {
+                    message << tuple.debug("");
+                }
             }
         }
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", tuple.debug("tablename").c_str());
