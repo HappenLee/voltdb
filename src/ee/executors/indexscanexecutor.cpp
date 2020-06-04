@@ -187,6 +187,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     AbstractExpression* post_expression = m_node->getPredicate();
     if (post_expression != nullptr) {
         VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
+        message << " PE:" << post_expression->debug(true).c_str();
     }
 
     // Initialize the postfilter
@@ -406,18 +407,21 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     VOLT_TRACE("Search key after substitutions: '%s', # of active search keys: %d",
             searchKey.debugNoHeader().c_str(), activeNumOfSearchKeys);
 
+    message << " KEY:" << searchKey.debugNoHeader().c_str();
     //
     // END EXPRESSION
     //
     AbstractExpression* end_expression = m_node->getEndExpression();
     if (end_expression != nullptr) {
         VOLT_DEBUG("End Expression:\n%s", end_expression->debug(true).c_str());
+        message << " EE:" << end_expression->debug(true).c_str();
     }
 
     // INITIAL EXPRESSION
     AbstractExpression* initial_expression = m_node->getInitialExpression();
     if (initial_expression != nullptr) {
         VOLT_DEBUG("Initial Expression:\n%s", initial_expression->debug(true).c_str());
+        message << " IE:" << initial_expression->debug(true).c_str();
     }
 
     //
@@ -427,6 +431,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     // For reverse scan edge case NULL values and forward scan underflow case.
     if (skipNullExpr != nullptr) {
         VOLT_DEBUG("COUNT NULL Expression:\n%s", skipNullExpr->debug(true).c_str());
+        message << " SKE:" << skipNullExpr->debug(true).c_str();
     }
 
     //
@@ -492,6 +497,11 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
     //
     int pendingDelete = 0;
     int nullRows = 0;
+    int skipNull = 0;
+    int out1= 0;
+    int out2 = 0;
+    int tempOut1 = 0;
+    int tempOut2 = 0;
     while (postfilter.isUnderLimit() && getNextTuple(
                 localLookupType, &tuple, tableIndex, &indexCursor, activeNumOfSearchKeys)) {
         if (tuple.isPendingDelete()) {
@@ -516,6 +526,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
         if (skipNullExpr != nullptr) {
             if (skipNullExpr->eval(&tuple, NULL).isTrue()) {
                 VOLT_DEBUG("Index scan: find out null rows or columns.");
+                skipNull++;
                 continue;
             } else {
                 skipNullExpr = nullptr;
@@ -526,6 +537,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
         //
         if (end_expression != nullptr && !end_expression->eval(&tuple, nullptr).isTrue()) {
             VOLT_TRACE("End Expression evaluated to false, stopping scan");
+            message << " END Session!";
             break;
         }
         //
@@ -534,18 +546,53 @@ bool IndexScanExecutor::p_execute(const NValueArray &params) {
         if (postfilter.eval(&tuple, nullptr)) {
             if (m_projector.numSteps() > 0) {
                 m_projector.exec(temp_tuple, tuple);
-                outputTuple(postfilter, temp_tuple);
+               // outputTuple(postfilter, temp_tuple);
+                out1++;
+                if (m_aggExec != nullptr) {
+                       m_aggExec->p_execute_tuple(temp_tuple);
+                   } else if (m_insertExec != nullptr) {
+                       m_insertExec->p_execute_tuple(temp_tuple);
+                   } else {
+                       //
+                       // Insert the tuple into our output table
+                       //
+                       vassert(m_tmpOutputTable);
+                       m_tmpOutputTable->insertTempTuple(temp_tuple);
+                       tempOut1++;
+                   }
             }
             else {
-                outputTuple(postfilter, tuple);
+             if (m_aggExec != nullptr) {
+            	        m_aggExec->p_execute_tuple(tuple);
+            	    } else if (m_insertExec != nullptr) {
+            	        m_insertExec->p_execute_tuple(tuple);
+            	    } else {
+            	        //
+            	        // Insert the tuple into our output table
+            	        //
+            	        vassert(m_tmpOutputTable);
+
+            	        m_tmpOutputTable->insertTempTuple(tuple);
+            	        tempOut2++;
+            	    }
+                out2++;
             }
             pmp.countdownProgress();
         }
     }
 
     message << " Pending:" << pendingDelete << " NULL:" << nullRows << " OUTTEMP:" << m_tmpOutputTable->tempTableTupleCount() <<
-    		" OUT" << m_outputTable->tempTableTupleCount();
-    if (targetTable->name().compare("EXPORT_PARTITIONED_TABLE_KAFKA") ==0) {
+        " OUT" << m_outputTable->tempTableTupleCount() << " OUT1:" << out1 << " OUT2:" << out2 << " skipNull:" << skipNull << " TO1:" << tempOut1 << " TO2:" <<tempOut2;
+    if (m_aggExec != NULL) {
+        message << " AG";
+    }
+
+    if (m_insertExec != NULL) {
+           message << " IE";
+       }
+
+   if (targetTable->name().compare("EXPORT_PARTITIONED_TABLE_KAFKA") ==0
+    || targetTable->name().compare("EXPORT_REPLICATED_TABLE_KAFKA") ==0) {
        std::string str = message.str();
        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);
     }

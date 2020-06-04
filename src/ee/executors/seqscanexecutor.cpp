@@ -314,11 +314,12 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     }
     message << " TEMP:" << m_tmpOutputTable->tempTableTupleCount() << " VALID:" << tuples << " OUT:" <<
          node->getOutputTable()->activeTupleCount() << " NULL:" << rows;
-    if (input_table->name().compare("EXPORT_PARTITIONED_TABLE_KAFKA") ==0) {
+    if (input_table->name().compare("EXPORT_PARTITIONED_TABLE_KAFKA") ==0 || input_table->name().compare("EXPORT_REPLICATED_TABLE_KAFKA") ==0) {
        std::string str = message.str();
        LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, &str);
     }
 
+    VOLT_INFO("%s",message.str().c_str());
     //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<
     //* for debug */    " output table " << (void*)output_table <<
     //* for debug */    " put " << output_table->activeTupleCount() << " tuples " << std::endl;
